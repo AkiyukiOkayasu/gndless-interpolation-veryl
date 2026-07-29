@@ -1,11 +1,13 @@
+import gndless_fixedpoint::Types::{RoundingMode, OverflowMode};
+
 /// 2点間の線形補間器
 ///
 /// `phase`は0以上1未満のunsigned Q0.`PHASE_WIDTH`値で、sample0からsample1へ移動する割合を表す。入力窓からの組み合わせlatencyは0です
 pub module LinearInterpolator #(
     param SAMPLE_WIDTH : u32                             = 32                                                   , /// サンプルの符号付きビット幅
     param PHASE_WIDTH  : u32                             = 32                                                   , /// 位相の小数部ビット幅
-    param ROUNDING_MODE: fixedpoint::Types::RoundingMode = fixedpoint::Types::RoundingMode::NEAREST_TIES_TO_EVEN, /// 右シフト時の丸め方式
-    param OVERFLOW_MODE: fixedpoint::Types::OverflowMode = fixedpoint::Types::OverflowMode::SATURATE            , /// 出力幅超過時の処理方式
+    param ROUNDING_MODE: RoundingMode = RoundingMode::NEAREST_TIES_TO_EVEN, /// 右シフト時の丸め方式
+    param OVERFLOW_MODE: OverflowMode = OverflowMode::SATURATE            , /// 出力幅超過時の処理方式
     const NUM_WIDTH    : u32                             = SAMPLE_WIDTH + PHASE_WIDTH + 3                       ,
 ) (
     sample0: input  signed logic<SAMPLE_WIDTH>, /// 補間窓の前側サンプル
@@ -20,7 +22,7 @@ pub module LinearInterpolator #(
         let sample0_ext: signed logic<NUM_WIDTH>        = sample0;
         let delta_ext  : signed logic<NUM_WIDTH>        = delta;
         let numerator  : signed logic<NUM_WIDTH>        = (sample0_ext <<< PHASE_WIDTH) + delta_ext * phase_ext;
-        sample      = fixedpoint::resize::<NUM_WIDTH, PHASE_WIDTH, SAMPLE_WIDTH, 0, ROUNDING_MODE, OVERFLOW_MODE>(
+        sample      = gndless_fixedpoint::resize::<NUM_WIDTH, PHASE_WIDTH, SAMPLE_WIDTH, 0, ROUNDING_MODE, OVERFLOW_MODE>(
             numerator,
         );
     }
@@ -68,13 +70,13 @@ module test_linear_interpolator_exhaustive_small_width {
         let delta_ext  : signed logic<10> = delta;
         let phase_ext  : signed logic<4>  = $signed({1'b0, phase});
         let numerator  : signed logic<10> = (sample0_ext <<< 3) + delta_ext * phase_ext;
-        expected    = fixedpoint::resize::<
+        expected    = gndless_fixedpoint::resize::<
             10                                                   ,
             3                                                    ,
             4                                                    ,
             0                                                    ,
-            fixedpoint::Types::RoundingMode::NEAREST_TIES_TO_EVEN,
-            fixedpoint::Types::OverflowMode::SATURATE            ,
+            RoundingMode::NEAREST_TIES_TO_EVEN,
+            OverflowMode::SATURATE            ,
         >(numerator);
     }
 
@@ -112,7 +114,7 @@ module test_linear_interpolator_rounding_modes {
     inst dut_toward_negative: LinearInterpolator #(
         SAMPLE_WIDTH : 8                                               ,
         PHASE_WIDTH  : 3                                               ,
-        ROUNDING_MODE: fixedpoint::Types::RoundingMode::TOWARD_NEGATIVE,
+        ROUNDING_MODE: RoundingMode::TOWARD_NEGATIVE,
     ) (
         sample0                 ,
         sample1                 ,
@@ -122,7 +124,7 @@ module test_linear_interpolator_rounding_modes {
     inst dut_toward_zero: LinearInterpolator #(
         SAMPLE_WIDTH : 8                                           ,
         PHASE_WIDTH  : 3                                           ,
-        ROUNDING_MODE: fixedpoint::Types::RoundingMode::TOWARD_ZERO,
+        ROUNDING_MODE: RoundingMode::TOWARD_ZERO,
     ) (
         sample0             ,
         sample1             ,
@@ -132,7 +134,7 @@ module test_linear_interpolator_rounding_modes {
     inst dut_toward_positive: LinearInterpolator #(
         SAMPLE_WIDTH : 8                                               ,
         PHASE_WIDTH  : 3                                               ,
-        ROUNDING_MODE: fixedpoint::Types::RoundingMode::TOWARD_POSITIVE,
+        ROUNDING_MODE: RoundingMode::TOWARD_POSITIVE,
     ) (
         sample0                 ,
         sample1                 ,
@@ -142,7 +144,7 @@ module test_linear_interpolator_rounding_modes {
     inst dut_ties_positive: LinearInterpolator #(
         SAMPLE_WIDTH : 8                                                            ,
         PHASE_WIDTH  : 3                                                            ,
-        ROUNDING_MODE: fixedpoint::Types::RoundingMode::NEAREST_TIES_TOWARD_POSITIVE,
+        ROUNDING_MODE: RoundingMode::NEAREST_TIES_TOWARD_POSITIVE,
     ) (
         sample0               ,
         sample1               ,
@@ -152,7 +154,7 @@ module test_linear_interpolator_rounding_modes {
     inst dut_ties_away: LinearInterpolator #(
         SAMPLE_WIDTH : 8                                                           ,
         PHASE_WIDTH  : 3                                                           ,
-        ROUNDING_MODE: fixedpoint::Types::RoundingMode::NEAREST_TIES_AWAY_FROM_ZERO,
+        ROUNDING_MODE: RoundingMode::NEAREST_TIES_AWAY_FROM_ZERO,
     ) (
         sample0           ,
         sample1           ,
@@ -162,7 +164,7 @@ module test_linear_interpolator_rounding_modes {
     inst dut_ties_even: LinearInterpolator #(
         SAMPLE_WIDTH : 8                                                    ,
         PHASE_WIDTH  : 3                                                    ,
-        ROUNDING_MODE: fixedpoint::Types::RoundingMode::NEAREST_TIES_TO_EVEN,
+        ROUNDING_MODE: RoundingMode::NEAREST_TIES_TO_EVEN,
     ) (
         sample0           ,
         sample1           ,

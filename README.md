@@ -7,7 +7,7 @@ sample windowを受け取るcombinational補間kernelです。ASRCのFIFO、phas
 linearはphase 0〜最大をsample0からsample1へ線形移動し、default roundingはnearest ties to evenです。cubicは`sample_m1`、`sample0`、`sample1`、`sample2`の4点3次LagrangeをHorner形式で評価し、全幅演算後に一度だけ丸め、default overflowはsaturationです。係数はQ2.16量子化です。
 
 linearとcubicの最終的な幅変換には、module parameterを直接受け取れる
-`fixedpoint::resize::<...>`を使用します。
+`gndless_fixedpoint::resize::<...>`を使用します。
 
 ```veryl
 inst interp: interpolation::CubicLagrangeInterpolator (...);
