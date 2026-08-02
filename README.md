@@ -13,4 +13,4 @@ linearとcubicの最終的な幅変換には、module parameterを直接受け�
 inst interp: interpolation::CubicLagrangeInterpolator (...);
 ```
 
-検証: `veryl fmt --check && veryl check && veryl test && veryl build && veryl doc`。benchmarkは固定vectorのみを使い、oscillatorへ依存しません。
+検証: `veryl fmt --check && veryl check && veryl test && veryl build && veryl doc`。benchmarkは固定vectorのみを使い、oscillatorへ依存しません。`interpolator_benchmark`はignored Native testとして48点量子化正弦波（0.125fs、0.25fs、20/48fs相当）をlinear/cubicへ同一window・256位相で入力し、`target/interpolator_benchmark.csv`を生成します。`tools/analyze_interpolator_benchmark.py`で理想連続正弦波との誤差、方式間差、インパルス周波数応答を比較できます。

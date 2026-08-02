@@ -15,7 +15,7 @@ from pathlib import Path
 SAMPLE_WIDTH = 32
 SAMPLE_FRACTION_BITS = 31
 DIFFERENCE_WIDTH = SAMPLE_WIDTH + 1
-DEFAULT_IMPULSE_CASE = 4
+DEFAULT_IMPULSE_CASE = 6
 SINE_SIGNAL_KIND = 2
 REFERENCE_AMPLITUDE = (1 << SAMPLE_FRACTION_BITS) - 1
 DEFAULT_FREQUENCIES = (0.0, 0.1, 0.2, 0.3, 0.4, 0.45, 0.49)
@@ -60,10 +60,24 @@ def read_rows(path: Path) -> list[dict[str, int]]:
 
         for line_number, row in enumerate(reader, start=2):
             try:
+                frequency_num = (
+                    int(row["frequency_num"])
+                    if row.get("frequency_num") not in (None, "")
+                    else int(row["frequency_milli_fs"])
+                )
+                frequency_den = (
+                    int(row["frequency_den"])
+                    if row.get("frequency_den") not in (None, "")
+                    else 1000
+                )
+                if frequency_den <= 0:
+                    raise ValueError("frequency_denが正でない")
                 parsed = {
                     "case": int(row["case"]),
                     "signal_kind": int(row["signal_kind"]),
                     "frequency_milli_fs": int(row["frequency_milli_fs"]),
+                    "frequency_num": frequency_num,
+                    "frequency_den": frequency_den,
                     "sample_index": int(row["sample_index"]),
                     "phase": int(row["phase"]),
                     "sample0": decode_twos_complement(row["sample0_bits"], SAMPLE_WIDTH),
@@ -119,7 +133,10 @@ def group_rows(rows: list[dict[str, int]]) -> tuple[dict[int, list[dict[str, int
             raise ValueError(f"case {case} に重複したsample_index/phaseがある")
         kinds = {row["signal_kind"] for row in case_rows}
         frequencies = {row["frequency_milli_fs"] for row in case_rows}
-        if len(kinds) != 1 or len(frequencies) != 1:
+        frequency_fractions = {
+            (row["frequency_num"], row["frequency_den"]) for row in case_rows
+        }
+        if len(kinds) != 1 or len(frequencies) != 1 or len(frequency_fractions) != 1:
             raise ValueError(f"case {case} の信号種別または周波数が途中で変化している")
         if next(iter(kinds)) == SINE_SIGNAL_KIND and next(iter(frequencies)) <= 0:
             raise ValueError(f"case {case} の正弦波周波数が0以下")
@@ -173,7 +190,7 @@ def sine_projection(
 
 def sine_summary(case: int, rows: list[dict[str, int]], phase_steps: int) -> dict[str, object]:
     """正弦波を理想的な連続正弦波と比較する。"""
-    frequency = rows[0]["frequency_milli_fs"] / 1000.0
+    frequency = rows[0]["frequency_num"] / rows[0]["frequency_den"]
     result: dict[str, object] = {
         "case": case,
         "frequency_fs": frequency,

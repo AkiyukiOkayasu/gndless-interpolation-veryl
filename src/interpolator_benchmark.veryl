@@ -13,7 +13,7 @@ module BenchmarkZeroOrderHold #(
 
 /// 補間kernelだけを比較する決定論的ベンチマーク
 ///
-/// oscillatorには依存せず、固定のstep/ramp/sign-crossing/impulse vectorを256位相へ展開する。CSV schemaはrootの解析スクリプトと互換に保つ
+/// oscillatorには依存せず、固定のstep/ramp/sign-crossing/正弦波/impulse vectorを256位相へ展開する。CSV schemaはrootの解析スクリプトと互換に保つ
 #[test(interpolator_benchmark)]
 #[ignore]
 module interpolator_benchmark {
@@ -35,6 +35,62 @@ module interpolator_benchmark {
     var cubic_difference       : signed logic<SAMPLE_WIDTH + 1>;
     var cubic_linear_difference: signed logic<SAMPLE_WIDTH + 1>;
     var file                   : $tb::file                     ;
+
+    /// 48点の量子化正弦波。table_step=6/12/20で0.125/0.25/20/48fs相当を構成する
+    function benchmark_sine (
+        index: input logic<6>,
+    ) -> signed logic<32> {
+        return case index {
+            6'd0   : 32'sd0,
+            6'd1   : 32'sd280_302_863,
+            6'd2   : 32'sd555_809_667,
+            6'd3   : 32'sd821_806_413,
+            6'd4   : 32'sd1_073_741_823,
+            6'd5   : 32'sd1_307_305_214,
+            6'd6   : 32'sd1_518_500_249,
+            6'd7   : 32'sd1_703_713_325,
+            6'd8   : 32'sd1_859_775_393,
+            6'd9   : 32'sd1_984_016_188,
+            6'd10  : 32'sd2_074_309_916,
+            6'd11  : 32'sd2_129_111_627,
+            6'd12  : 32'sd2_147_483_647,
+            6'd13  : 32'sd2_129_111_627,
+            6'd14  : 32'sd2_074_309_916,
+            6'd15  : 32'sd1_984_016_188,
+            6'd16  : 32'sd1_859_775_393,
+            6'd17  : 32'sd1_703_713_325,
+            6'd18  : 32'sd1_518_500_249,
+            6'd19  : 32'sd1_307_305_214,
+            6'd20  : 32'sd1_073_741_823,
+            6'd21  : 32'sd821_806_413,
+            6'd22  : 32'sd555_809_667,
+            6'd23  : 32'sd280_302_863,
+            6'd24  : 32'sd0,
+            6'd25  : -32'sd280_302_863,
+            6'd26  : -32'sd555_809_667,
+            6'd27  : -32'sd821_806_413,
+            6'd28  : -32'sd1_073_741_823,
+            6'd29  : -32'sd1_307_305_214,
+            6'd30  : -32'sd1_518_500_249,
+            6'd31  : -32'sd1_703_713_325,
+            6'd32  : -32'sd1_859_775_393,
+            6'd33  : -32'sd1_984_016_188,
+            6'd34  : -32'sd2_074_309_916,
+            6'd35  : -32'sd2_129_111_627,
+            6'd36  : -32'sd2_147_483_647,
+            6'd37  : -32'sd2_129_111_627,
+            6'd38  : -32'sd2_074_309_916,
+            6'd39  : -32'sd1_984_016_188,
+            6'd40  : -32'sd1_859_775_393,
+            6'd41  : -32'sd1_703_713_325,
+            6'd42  : -32'sd1_518_500_249,
+            6'd43  : -32'sd1_307_305_214,
+            6'd44  : -32'sd1_073_741_823,
+            6'd45  : -32'sd821_806_413,
+            6'd46  : -32'sd555_809_667,
+            default: -32'sd280_302_863,
+        };
+    }
 
     inst hold: BenchmarkZeroOrderHold #(
         SAMPLE_WIDTH: SAMPLE_WIDTH,
@@ -91,10 +147,12 @@ module interpolator_benchmark {
             phase = p as PHASE_WIDTH;
             clk.next(1);
             file.write(
-                "%d,%d,%d,%d,%d,%h,%h,%h,%h,%h,%h,%h,%h\n",
+                "%d,%d,%d,%d,%d,%d,%d,%h,%h,%h,%h,%h,%h,%h,%h\n",
                 case_id,
                 0,
                 0,
+                0,
+                1,
                 0,
                 phase,
                 sample0,
@@ -132,10 +190,12 @@ module interpolator_benchmark {
                 phase = p as PHASE_WIDTH;
                 clk.next(1);
                 file.write(
-                    "%d,%d,%d,%d,%d,%h,%h,%h,%h,%h,%h,%h,%h\n",
-                    8'd4,
+                    "%d,%d,%d,%d,%d,%d,%d,%h,%h,%h,%h,%h,%h,%h,%h\n",
+                    8'd6,
                     1,
                     0,
+                    0,
+                    1,
                     sample_index,
                     phase,
                     sample0,
@@ -151,14 +211,56 @@ module interpolator_benchmark {
         }
     }
 
+    /// 量子化正弦波を同じsample windowと位相でlinear/cubicへ入力する
+    function write_sine (
+        case_id           : input logic<8> ,
+        table_step        : input logic<6> ,
+        frequency_milli_fs: input logic<16>,
+    ) {
+        var table_index: logic<7>;
+        table_index = 0;
+        for sample_index in 0..48 {
+            sample_m1 = benchmark_sine(((table_index + 7'd48 - table_step) % 7'd48) as 6);
+            sample0   = benchmark_sine(table_index as 6);
+            sample1   = benchmark_sine(((table_index + table_step) % 7'd48) as 6);
+            sample2   = benchmark_sine(((table_index + table_step + table_step) % 7'd48) as 6);
+            for p in 0..256 {
+                phase = p as PHASE_WIDTH;
+                clk.next(1);
+                file.write(
+                    "%d,%d,%d,%d,%d,%d,%d,%h,%h,%h,%h,%h,%h,%h,%h\n",
+                    case_id,
+                    2,
+                    frequency_milli_fs,
+                    table_step,
+                    6'd48,
+                    sample_index,
+                    phase,
+                    sample0,
+                    sample1,
+                    hold_sample,
+                    linear_sample,
+                    cubic_sample,
+                    linear_difference,
+                    cubic_difference,
+                    cubic_linear_difference,
+                );
+            }
+            table_index = (table_index + table_step) % 7'd48;
+        }
+    }
+
     initial {
         file.open("target/interpolator_benchmark.csv");
         file.write(
-            "case,signal_kind,frequency_milli_fs,sample_index,phase,sample0_bits,sample1_bits,zero_order_hold_bits,linear_bits,cubic_bits,linear_minus_hold_bits,cubic_minus_hold_bits,cubic_minus_linear_bits\n",
+            "case,signal_kind,frequency_milli_fs,frequency_num,frequency_den,sample_index,phase,sample0_bits,sample1_bits,zero_order_hold_bits,linear_bits,cubic_bits,linear_minus_hold_bits,cubic_minus_hold_bits,cubic_minus_linear_bits\n",
         );
         write_window(8'd0, 32'sd0, 32'sd0, 32'sd1_000_000_000, 32'sd1_000_000_000);
         write_window(8'd1, 32'sd0, 32'sd0, 32'sd1_000_000_000, 32'sd2_000_000_000);
         write_window(8'd2, -32'sd1_000_000_000, -32'sd1_000_000_000, 32'sd1_000_000_000, 32'sd1_000_000_000);
+        write_sine(8'd3, 6'd6, 16'd125);
+        write_sine(8'd4, 6'd12, 16'd250);
+        write_sine(8'd5, 6'd20, 16'd417);
         write_impulse();
         file.close();
         $finish();
