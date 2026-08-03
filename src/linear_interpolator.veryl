@@ -3,12 +3,15 @@ import gndless_fixedpoint::Types::{RoundingMode, OverflowMode};
 /// 2点間の線形補間器
 ///
 /// `phase`は0以上1未満のunsigned Q0.`PHASE_WIDTH`値で、sample0からsample1へ移動する割合を表す。入力窓からの組み合わせlatencyは0です
-pub module LinearInterpolator #(
-    param SAMPLE_WIDTH : u32                             = 32                                                   , /// サンプルの符号付きビット幅
-    param PHASE_WIDTH  : u32                             = 32                                                   , /// 位相の小数部ビット幅
-    param ROUNDING_MODE: RoundingMode = RoundingMode::NEAREST_TIES_TO_EVEN, /// 右シフト時の丸め方式
-    param OVERFLOW_MODE: OverflowMode = OverflowMode::SATURATE            , /// 出力幅超過時の処理方式
-    const NUM_WIDTH    : u32                             = SAMPLE_WIDTH + PHASE_WIDTH + 3                       ,
+module LinearInterpolatorCore #(
+    param SAMPLE_WIDTH   : u32          = 24                                , /// サンプルの符号付きビット幅
+    param PHASE_WIDTH    : u32          = 32                                , /// 位相の小数部ビット幅
+    param ROUNDING_MODE  : RoundingMode = RoundingMode::NEAREST_TIES_TO_EVEN, /// 右シフト時の丸め方式
+    param OVERFLOW_MODE  : OverflowMode = OverflowMode::SATURATE            , /// 出力幅超過時の処理方式
+    const DELTA_WIDTH    : u32          = SAMPLE_WIDTH + 1                  ,
+    const PHASE_EXT_WIDTH: u32          = PHASE_WIDTH + 1                   ,
+    const PRODUCT_WIDTH  : u32          = DELTA_WIDTH + PHASE_EXT_WIDTH     ,
+    const NUM_WIDTH      : u32          = PRODUCT_WIDTH + 1                 ,
 ) (
     sample0: input  signed logic<SAMPLE_WIDTH>, /// 補間窓の前側サンプル
     sample1: input  signed logic<SAMPLE_WIDTH>, /// 補間窓の後側サンプル
@@ -16,15 +19,67 @@ pub module LinearInterpolator #(
     sample : output signed logic<SAMPLE_WIDTH>, /// 補間結果
 ) {
     always_comb {
-        let delta      : signed logic<SAMPLE_WIDTH + 1> = $signed({sample1[msb], sample1})
+        let delta         : signed logic<DELTA_WIDTH>     = $signed({sample1[msb], sample1})
             - $signed({sample0[msb], sample0});
-        let phase_ext  : signed logic<PHASE_WIDTH + 1>  = $signed({1'b0, phase});
-        let sample0_ext: signed logic<NUM_WIDTH>        = sample0;
-        let delta_ext  : signed logic<NUM_WIDTH>        = delta;
-        let numerator  : signed logic<NUM_WIDTH>        = (sample0_ext <<< PHASE_WIDTH) + delta_ext * phase_ext;
-        sample      = gndless_fixedpoint::resize::<NUM_WIDTH, PHASE_WIDTH, SAMPLE_WIDTH, 0, ROUNDING_MODE, OVERFLOW_MODE>(
-            numerator,
-        );
+        let phase_ext     : signed logic<PHASE_EXT_WIDTH> = $signed({1'b0, phase});
+        let product       : signed logic<PRODUCT_WIDTH>   = delta * phase_ext;
+        let sample0_scaled: signed logic<NUM_WIDTH>       = sample0 <<< PHASE_WIDTH;
+        let numerator     : signed logic<NUM_WIDTH>       = sample0_scaled + product;
+        sample         = gndless_fixedpoint::resize::<
+            NUM_WIDTH    ,
+            PHASE_WIDTH  ,
+            SAMPLE_WIDTH ,
+            0            ,
+            ROUNDING_MODE,
+            OVERFLOW_MODE,
+        >(numerator);
+    }
+}
+
+/// formatを保持したsample interfaceを使う2点間の線形補間器
+///
+/// `FORMAT`はsampleの幅とbinary pointを一体で指定する。既定のQ2.23は24bit PCMを精度を失わずに符号拡張し、ASRC処理中のheadroomを確保する
+pub module LinearInterpolator::<FORMAT: gndless_fixedpoint::SignedFixedPointFormat = gndless_fixedpoint::Q2_23> #(
+    param PHASE_WIDTH  : u32          = 32                                , /// 位相の小数部ビット幅
+    param ROUNDING_MODE: RoundingMode = RoundingMode::NEAREST_TIES_TO_EVEN, /// 右シフト時の丸め方式
+    param OVERFLOW_MODE: OverflowMode = OverflowMode::SATURATE            , /// 出力範囲超過時の処理方式
+) (
+    sample0: modport gndless_fixedpoint::FixedPointPort::<FORMAT>::input_port              , /// 補間窓の前側sample
+    sample1: modport gndless_fixedpoint::FixedPointPort::<FORMAT>::input_port              , /// 補間窓の後側sample
+    phase  : input   logic                                                    <PHASE_WIDTH>, /// sample0からsample1へ進む位相
+    sample : modport gndless_fixedpoint::FixedPointPort::<FORMAT>::output_port             , /// 補間結果
+) {
+    inst core: LinearInterpolatorCore #(
+        SAMPLE_WIDTH : FORMAT::WIDTH,
+        PHASE_WIDTH  : PHASE_WIDTH  ,
+        ROUNDING_MODE: ROUNDING_MODE,
+        OVERFLOW_MODE: OVERFLOW_MODE,
+    ) (
+        sample0: sample0.raw,
+        sample1: sample1.raw,
+        phase               ,
+        sample : sample.raw ,
+    );
+}
+
+/// 既定Q2.23 formatのpublic wrapperとinterface方向を検証
+#[test(test_linear_interpolator_q2_23)]
+module test_linear_interpolator_q2_23 {
+    inst clk    : $tb::clock_gen;
+    inst sample0: gndless_fixedpoint::FixedPointPort::<gndless_fixedpoint::Q2_23>;
+    inst sample1: gndless_fixedpoint::FixedPointPort::<gndless_fixedpoint::Q2_23>;
+    var phase: logic<4>;
+    inst sample: gndless_fixedpoint::FixedPointPort::<gndless_fixedpoint::Q2_23>;
+
+    inst dut: LinearInterpolator #( PHASE_WIDTH: 4 ) ( sample0, sample1, phase, sample );
+
+    initial {
+        sample0.raw = -gndless_fixedpoint::Q2_23::ONE;
+        sample1.raw = gndless_fixedpoint::Q2_23::ONE;
+        phase       = 4'd8;
+        clk.next();
+        $assert(sample.raw == gndless_fixedpoint::Q2_23::ZERO, "Q2.23 wrapper midpoint mismatch");
+        $finish();
     }
 }
 
@@ -36,7 +91,7 @@ module test_linear_interpolator {
     var phase  : logic       <4> ;
     var sample : signed logic<16>;
 
-    inst dut: LinearInterpolator #( SAMPLE_WIDTH: 16, PHASE_WIDTH: 4 ) ( sample0, sample1, phase, sample );
+    inst dut: LinearInterpolatorCore #( SAMPLE_WIDTH: 16, PHASE_WIDTH: 4 ) ( sample0, sample1, phase, sample );
 
     initial {
         sample0 = -16'sd1000;
@@ -62,7 +117,7 @@ module test_linear_interpolator_exhaustive_small_width {
     var sample  : signed logic<4>;
     var expected: signed logic<4>;
 
-    inst dut: LinearInterpolator #( SAMPLE_WIDTH: 4, PHASE_WIDTH: 3 ) ( sample0, sample1, phase, sample );
+    inst dut: LinearInterpolatorCore #( SAMPLE_WIDTH: 4, PHASE_WIDTH: 3 ) ( sample0, sample1, phase, sample );
 
     always_comb {
         let delta      : signed logic<5>  = $signed({sample1[msb], sample1}) - $signed({sample0[msb], sample0});
@@ -71,10 +126,10 @@ module test_linear_interpolator_exhaustive_small_width {
         let phase_ext  : signed logic<4>  = $signed({1'b0, phase});
         let numerator  : signed logic<10> = (sample0_ext <<< 3) + delta_ext * phase_ext;
         expected    = gndless_fixedpoint::resize::<
-            10                                                   ,
-            3                                                    ,
-            4                                                    ,
-            0                                                    ,
+            10                                ,
+            3                                 ,
+            4                                 ,
+            0                                 ,
             RoundingMode::NEAREST_TIES_TO_EVEN,
             OverflowMode::SATURATE            ,
         >(numerator);
@@ -111,9 +166,9 @@ module test_linear_interpolator_rounding_modes {
     var ties_away      : signed logic<8>;
     var ties_even      : signed logic<8>;
 
-    inst dut_toward_negative: LinearInterpolator #(
-        SAMPLE_WIDTH : 8                                               ,
-        PHASE_WIDTH  : 3                                               ,
+    inst dut_toward_negative: LinearInterpolatorCore #(
+        SAMPLE_WIDTH : 8                            ,
+        PHASE_WIDTH  : 3                            ,
         ROUNDING_MODE: RoundingMode::TOWARD_NEGATIVE,
     ) (
         sample0                 ,
@@ -121,9 +176,9 @@ module test_linear_interpolator_rounding_modes {
         phase                   ,
         sample : toward_negative,
     );
-    inst dut_toward_zero: LinearInterpolator #(
-        SAMPLE_WIDTH : 8                                           ,
-        PHASE_WIDTH  : 3                                           ,
+    inst dut_toward_zero: LinearInterpolatorCore #(
+        SAMPLE_WIDTH : 8                        ,
+        PHASE_WIDTH  : 3                        ,
         ROUNDING_MODE: RoundingMode::TOWARD_ZERO,
     ) (
         sample0             ,
@@ -131,9 +186,9 @@ module test_linear_interpolator_rounding_modes {
         phase               ,
         sample : toward_zero,
     );
-    inst dut_toward_positive: LinearInterpolator #(
-        SAMPLE_WIDTH : 8                                               ,
-        PHASE_WIDTH  : 3                                               ,
+    inst dut_toward_positive: LinearInterpolatorCore #(
+        SAMPLE_WIDTH : 8                            ,
+        PHASE_WIDTH  : 3                            ,
         ROUNDING_MODE: RoundingMode::TOWARD_POSITIVE,
     ) (
         sample0                 ,
@@ -141,9 +196,9 @@ module test_linear_interpolator_rounding_modes {
         phase                   ,
         sample : toward_positive,
     );
-    inst dut_ties_positive: LinearInterpolator #(
-        SAMPLE_WIDTH : 8                                                            ,
-        PHASE_WIDTH  : 3                                                            ,
+    inst dut_ties_positive: LinearInterpolatorCore #(
+        SAMPLE_WIDTH : 8                                         ,
+        PHASE_WIDTH  : 3                                         ,
         ROUNDING_MODE: RoundingMode::NEAREST_TIES_TOWARD_POSITIVE,
     ) (
         sample0               ,
@@ -151,9 +206,9 @@ module test_linear_interpolator_rounding_modes {
         phase                 ,
         sample : ties_positive,
     );
-    inst dut_ties_away: LinearInterpolator #(
-        SAMPLE_WIDTH : 8                                                           ,
-        PHASE_WIDTH  : 3                                                           ,
+    inst dut_ties_away: LinearInterpolatorCore #(
+        SAMPLE_WIDTH : 8                                        ,
+        PHASE_WIDTH  : 3                                        ,
         ROUNDING_MODE: RoundingMode::NEAREST_TIES_AWAY_FROM_ZERO,
     ) (
         sample0           ,
@@ -161,9 +216,9 @@ module test_linear_interpolator_rounding_modes {
         phase             ,
         sample : ties_away,
     );
-    inst dut_ties_even: LinearInterpolator #(
-        SAMPLE_WIDTH : 8                                                    ,
-        PHASE_WIDTH  : 3                                                    ,
+    inst dut_ties_even: LinearInterpolatorCore #(
+        SAMPLE_WIDTH : 8                                 ,
+        PHASE_WIDTH  : 3                                 ,
         ROUNDING_MODE: RoundingMode::NEAREST_TIES_TO_EVEN,
     ) (
         sample0           ,

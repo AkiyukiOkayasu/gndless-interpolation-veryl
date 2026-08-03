@@ -1,6 +1,6 @@
 [project]
 name = "gndless_interpolation"
-version = "0.1.0"
+version = "0.2.0"
 authors = ["Akiyuki Okayasu"]
 description = "Combinational sample interpolation kernels for Veryl."
 license = "MIT OR Apache-2.0"
@@ -13,7 +13,7 @@ target = { type = "directory", path = "target" }
 [test]
 
 [dependencies]
-gndless_fixedpoint = { github = "AkiyukiOkayasu/gndless-fixedpoint-veryl", version = "0.1.0" }
+gndless_fixedpoint = { path = "../gndless-fixedpoint-veryl" }
 
 [publish]
 register = true

@@ -102,7 +102,7 @@ module interpolator_benchmark {
         sample : hold_sample,
     );
 
-    inst linear: LinearInterpolator #(
+    inst linear: LinearInterpolatorCore #(
         SAMPLE_WIDTH: SAMPLE_WIDTH,
         PHASE_WIDTH : PHASE_WIDTH ,
     ) (
@@ -112,7 +112,7 @@ module interpolator_benchmark {
         sample : linear_sample,
     );
 
-    inst cubic: CubicLagrangeInterpolator #(
+    inst cubic: CubicLagrangeInterpolatorCore #(
         SAMPLE_WIDTH: SAMPLE_WIDTH,
         PHASE_WIDTH : PHASE_WIDTH ,
     ) (
