@@ -15,6 +15,7 @@
 
 ### Changed
 
+- `gndless_fixedpoint`依存を公開済みの0.2.0へ更新
 - 破壊的変更: `LinearInterpolator`と`CubicLagrangeInterpolator`を`FORMAT` genericと`FixedPointValue::<FORMAT>` portへ移行し、既定formatをQ2.23へ変更
 - `LinearInterpolator`の差分とphaseの積を、accumulatorへ事前拡張せず必要なoperand幅のまま生成するよう整理
 - `ZeroOrderHold`を公開APIから外し、比較ベンチマーク専用の`BenchmarkZeroOrderHold`へ整理
