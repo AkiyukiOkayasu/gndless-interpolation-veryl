@@ -44,10 +44,10 @@ pub module LinearInterpolator::<FORMAT: gndless_fixedpoint::SignedFixedPointForm
     param ROUNDING_MODE: RoundingMode = RoundingMode::NEAREST_TIES_TO_EVEN, /// 右シフト時の丸め方式
     param OVERFLOW_MODE: OverflowMode = OverflowMode::SATURATE            , /// 出力範囲超過時の処理方式
 ) (
-    sample0: modport gndless_fixedpoint::FixedPointPort::<FORMAT>::input_port              , /// 補間窓の前側sample
-    sample1: modport gndless_fixedpoint::FixedPointPort::<FORMAT>::input_port              , /// 補間窓の後側sample
-    phase  : input   logic                                                    <PHASE_WIDTH>, /// sample0からsample1へ進む位相
-    sample : modport gndless_fixedpoint::FixedPointPort::<FORMAT>::output_port             , /// 補間結果
+    sample0: modport gndless_fixedpoint::FixedPointValue::<FORMAT>::input_port              , /// 補間窓の前側sample
+    sample1: modport gndless_fixedpoint::FixedPointValue::<FORMAT>::input_port              , /// 補間窓の後側sample
+    phase  : input   logic                                                     <PHASE_WIDTH>, /// sample0からsample1へ進む位相
+    sample : modport gndless_fixedpoint::FixedPointValue::<FORMAT>::output_port             , /// 補間結果
 ) {
     inst core: LinearInterpolatorCore #(
         SAMPLE_WIDTH : FORMAT::WIDTH,
@@ -66,10 +66,10 @@ pub module LinearInterpolator::<FORMAT: gndless_fixedpoint::SignedFixedPointForm
 #[test(test_linear_interpolator_q2_23)]
 module test_linear_interpolator_q2_23 {
     inst clk    : $tb::clock_gen;
-    inst sample0: gndless_fixedpoint::FixedPointPort::<gndless_fixedpoint::Q2_23>;
-    inst sample1: gndless_fixedpoint::FixedPointPort::<gndless_fixedpoint::Q2_23>;
+    inst sample0: gndless_fixedpoint::FixedPointValue::<gndless_fixedpoint::Q2_23>;
+    inst sample1: gndless_fixedpoint::FixedPointValue::<gndless_fixedpoint::Q2_23>;
     var phase: logic<4>;
-    inst sample: gndless_fixedpoint::FixedPointPort::<gndless_fixedpoint::Q2_23>;
+    inst sample: gndless_fixedpoint::FixedPointValue::<gndless_fixedpoint::Q2_23>;
 
     inst dut: LinearInterpolator #( PHASE_WIDTH: 4 ) ( sample0, sample1, phase, sample );
 

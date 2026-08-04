@@ -15,6 +15,6 @@
 
 ### Changed
 
-- 破壊的変更: `LinearInterpolator`と`CubicLagrangeInterpolator`を`FORMAT` genericと`FixedPointPort::<FORMAT>` portへ移行し、既定formatをQ2.23へ変更
+- 破壊的変更: `LinearInterpolator`と`CubicLagrangeInterpolator`を`FORMAT` genericと`FixedPointValue::<FORMAT>` portへ移行し、既定formatをQ2.23へ変更
 - `LinearInterpolator`の差分とphaseの積を、accumulatorへ事前拡張せず必要なoperand幅のまま生成するよう整理
 - `ZeroOrderHold`を公開APIから外し、比較ベンチマーク専用の`BenchmarkZeroOrderHold`へ整理

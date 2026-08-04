@@ -72,12 +72,12 @@ pub module CubicLagrangeInterpolator::<
     param ROUNDING_MODE: RoundingMode = RoundingMode::NEAREST_TIES_TO_EVEN, /// 右シフト時の丸め方式
     param OVERFLOW_MODE: OverflowMode = OverflowMode::SATURATE            , /// 出力範囲超過時の処理方式
 ) (
-    sample_m1: modport gndless_fixedpoint::FixedPointPort::<FORMAT>::input_port              , /// 補間窓の1つ前のsample
-    sample0  : modport gndless_fixedpoint::FixedPointPort::<FORMAT>::input_port              , /// 補間窓の第1sample
-    sample1  : modport gndless_fixedpoint::FixedPointPort::<FORMAT>::input_port              , /// 補間窓の第2sample
-    sample2  : modport gndless_fixedpoint::FixedPointPort::<FORMAT>::input_port              , /// 補間窓の第3sample
-    phase    : input   logic                                                    <PHASE_WIDTH>, /// sample0からsample1へ進む位相
-    sample   : modport gndless_fixedpoint::FixedPointPort::<FORMAT>::output_port             , /// 補間結果
+    sample_m1: modport gndless_fixedpoint::FixedPointValue::<FORMAT>::input_port              , /// 補間窓の1つ前のsample
+    sample0  : modport gndless_fixedpoint::FixedPointValue::<FORMAT>::input_port              , /// 補間窓の第1sample
+    sample1  : modport gndless_fixedpoint::FixedPointValue::<FORMAT>::input_port              , /// 補間窓の第2sample
+    sample2  : modport gndless_fixedpoint::FixedPointValue::<FORMAT>::input_port              , /// 補間窓の第3sample
+    phase    : input   logic                                                     <PHASE_WIDTH>, /// sample0からsample1へ進む位相
+    sample   : modport gndless_fixedpoint::FixedPointValue::<FORMAT>::output_port             , /// 補間結果
 ) {
     inst core: CubicLagrangeInterpolatorCore #(
         SAMPLE_WIDTH : FORMAT::WIDTH,
