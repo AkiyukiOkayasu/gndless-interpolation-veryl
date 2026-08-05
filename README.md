@@ -1,6 +1,7 @@
 # gndless_interpolation
 
-sample windowを受け取るcombinational補間kernelです。ASRCのFIFO、phase accumulator、filterは所有しません。
+数学的な関数近似の補間用package。
+レート変換はこのpackageには含まない。
 
 公開APIは`LinearInterpolator`と`CubicLagrangeInterpolator`です。sample portは
 `FixedPointValue::<FORMAT>`でformatを指定し、既定はASRC処理用のQ2.23です。phaseはunsigned
