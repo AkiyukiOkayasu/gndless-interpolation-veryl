@@ -3,12 +3,15 @@ import gndless_fixedpoint::Types::{RoundingMode, OverflowMode};
 /// 2点間の線形補間器
 ///
 /// `phase`は0以上1未満のunsigned Q0.`PHASE_WIDTH`値で、sample0からsample1へ移動する割合を表す。入力窓からの組み合わせlatencyは0です
+/// `delta = sample1 - sample0`はSAMPLE_WIDTH幅でwrapするため、|sample1 - sample0| < 2^(SAMPLE_WIDTH - 1)を要求する。
+/// ±1.0信号では常に成立し、範囲外の入力では出力はwrapにより定義されない。
+/// 乗算は`delta`×`phase_ext`の1個で、既定のQ4.23(27bit)では27x36乗算器1スライスに収まる。
 module LinearInterpolatorCore #(
     param SAMPLE_WIDTH   : u32          = 24                                , /// サンプルの符号付きビット幅
     param PHASE_WIDTH    : u32          = 32                                , /// 位相の小数部ビット幅
     param ROUNDING_MODE  : RoundingMode = RoundingMode::NEAREST_TIES_TO_EVEN, /// 右シフト時の丸め方式
     param OVERFLOW_MODE  : OverflowMode = OverflowMode::SATURATE            , /// 出力幅超過時の処理方式
-    const DELTA_WIDTH    : u32          = SAMPLE_WIDTH + 1                  ,
+    const DELTA_WIDTH    : u32          = SAMPLE_WIDTH                      ,
     const PHASE_EXT_WIDTH: u32          = PHASE_WIDTH + 1                   ,
     const PRODUCT_WIDTH  : u32          = DELTA_WIDTH + PHASE_EXT_WIDTH     ,
     const NUM_WIDTH      : u32          = PRODUCT_WIDTH + 1                 ,
@@ -19,8 +22,7 @@ module LinearInterpolatorCore #(
     sample : output signed logic<SAMPLE_WIDTH>, /// 補間結果
 ) {
     always_comb {
-        let delta         : signed logic<DELTA_WIDTH>     = $signed({sample1[msb], sample1})
-            - $signed({sample0[msb], sample0});
+        let delta         : signed logic<DELTA_WIDTH>     = sample1 - sample0;
         let phase_ext     : signed logic<PHASE_EXT_WIDTH> = $signed({1'b0, phase});
         let product       : signed logic<PRODUCT_WIDTH>   = delta * phase_ext;
         let sample0_scaled: signed logic<NUM_WIDTH>       = sample0 <<< PHASE_WIDTH;
@@ -38,8 +40,8 @@ module LinearInterpolatorCore #(
 
 /// formatを保持したsample interfaceを使う2点間の線形補間器
 ///
-/// `FORMAT`はsampleの幅とbinary pointを一体で指定する。既定のQ2.23は24bit PCMを精度を失わずに符号拡張し、ASRC処理中のheadroomを確保する
-pub module LinearInterpolator::<FORMAT: gndless_fixedpoint::SignedFixedPointFormat = gndless_fixedpoint::Q2_23> #(
+/// `FORMAT`はsampleの幅とbinary pointを一体で指定する。既定のQ4.23は24bit PCM(Q1.23)と同じ2^-23グリッドを保ち、±8.0の範囲で扱う
+pub module LinearInterpolator::<FORMAT: gndless_fixedpoint::SignedFixedPointFormat = gndless_fixedpoint::Q4_23> #(
     param PHASE_WIDTH  : u32          = 32                                , /// 位相の小数部ビット幅
     param ROUNDING_MODE: RoundingMode = RoundingMode::NEAREST_TIES_TO_EVEN, /// 右シフト時の丸め方式
     param OVERFLOW_MODE: OverflowMode = OverflowMode::SATURATE            , /// 出力範囲超過時の処理方式
@@ -62,23 +64,23 @@ pub module LinearInterpolator::<FORMAT: gndless_fixedpoint::SignedFixedPointForm
     );
 }
 
-/// 既定Q2.23 formatのpublic wrapperとinterface方向を検証
-#[test(test_linear_interpolator_q2_23)]
-module test_linear_interpolator_q2_23 {
+/// 既定Q4.23 formatのpublic wrapperとinterface方向を検証
+#[test(test_linear_interpolator_q4_23)]
+module test_linear_interpolator_q4_23 {
     inst clk    : $tb::clock_gen;
-    inst sample0: gndless_fixedpoint::FixedPointValue::<gndless_fixedpoint::Q2_23>;
-    inst sample1: gndless_fixedpoint::FixedPointValue::<gndless_fixedpoint::Q2_23>;
+    inst sample0: gndless_fixedpoint::FixedPointValue::<gndless_fixedpoint::Q4_23>;
+    inst sample1: gndless_fixedpoint::FixedPointValue::<gndless_fixedpoint::Q4_23>;
     var phase: logic<4>;
-    inst sample: gndless_fixedpoint::FixedPointValue::<gndless_fixedpoint::Q2_23>;
+    inst sample: gndless_fixedpoint::FixedPointValue::<gndless_fixedpoint::Q4_23>;
 
     inst dut: LinearInterpolator #( PHASE_WIDTH: 4 ) ( sample0, sample1, phase, sample );
 
     initial {
-        sample0.raw = -gndless_fixedpoint::Q2_23::ONE;
-        sample1.raw = gndless_fixedpoint::Q2_23::ONE;
+        sample0.raw = -gndless_fixedpoint::Q4_23::ONE;
+        sample1.raw = gndless_fixedpoint::Q4_23::ONE;
         phase       = 4'd8;
         clk.next();
-        $assert(sample.raw == gndless_fixedpoint::Q2_23::ZERO, "Q2.23 wrapper midpoint mismatch");
+        $assert(sample.raw == gndless_fixedpoint::Q4_23::ZERO, "Q4.23 wrapper midpoint mismatch");
         $finish();
     }
 }
@@ -107,6 +109,8 @@ module test_linear_interpolator {
 }
 
 /// sample width 4、phase width 3の全入力組み合わせを検証
+///
+/// `delta`はDUTと同じSAMPLE_WIDTH幅のwrap減算でreference modelを等価にする
 #[test(test_linear_interpolator_exhaustive_small_width)]
 module test_linear_interpolator_exhaustive_small_width {
     inst clk: $tb::clock_gen;
@@ -120,7 +124,7 @@ module test_linear_interpolator_exhaustive_small_width {
     inst dut: LinearInterpolatorCore #( SAMPLE_WIDTH: 4, PHASE_WIDTH: 3 ) ( sample0, sample1, phase, sample );
 
     always_comb {
-        let delta      : signed logic<5>  = $signed({sample1[msb], sample1}) - $signed({sample0[msb], sample0});
+        let delta      : signed logic<4>  = sample1 - sample0;
         let sample0_ext: signed logic<10> = sample0;
         let delta_ext  : signed logic<10> = delta;
         let phase_ext  : signed logic<4>  = $signed({1'b0, phase});
