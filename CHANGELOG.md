@@ -2,10 +2,6 @@
 
 ## [Unreleased]
 
-- 公開interpolatorのparam/port doc commentを追加し、説明文の途中改行を整理
-- doc commentの句点と体言止めの表記を整理
-- doc commentのsummary表記を統一
-- 各testのdoc commentを検証目的が分かる表現へ統一
 ### Added
 
 - linear、cubic Lagrange補間kernelを独立packageへ移動
@@ -15,7 +11,10 @@
 
 ### Changed
 
-- `gndless_fixedpoint`依存を公開済みの0.2.1へ更新
-- 破壊的変更: `LinearInterpolator`と`CubicLagrangeInterpolator`を`FORMAT` genericと`FixedPointValue::<FORMAT>` portへ移行し、既定formatをQ2.23へ変更
-- `LinearInterpolator`の差分とphaseの積を、accumulatorへ事前拡張せず必要なoperand幅のまま生成するよう整理
+- `gndless_fixedpoint`依存を公開済みの0.2.2へ更新
 - `ZeroOrderHold`を公開APIから外し、比較ベンチマーク専用の`BenchmarkZeroOrderHold`へ整理
+
+## BREAKING CHANGE
+
+- `LinearInterpolator`と`CubicLagrangeInterpolator`を`FORMAT` genericと`FixedPointValue::<FORMAT>` portへ移行し、既定formatをQ4.23へ変更
+- `LinearInterpolatorCore`の`delta`をSAMPLE_WIDTH幅のwrap減算へ変更し、|sample1 - sample0| < 2^(SAMPLE_WIDTH - 1)の入力契約をdoc commentへ明記した。既定のQ4.23(27bit)ではdelta×phase_extが27x36乗算器1スライスへ収まる
