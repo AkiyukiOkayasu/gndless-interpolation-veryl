@@ -1,15 +1,17 @@
-import gndless_fixedpoint::Types::{RoundingMode, OverflowMode};
+import gndless_fixedpoint::Types;
+import gndless_fixedpoint::FixedPointValue;
+import gndless_fixedpoint::Q2_23;
 
 /// 4点3次Lagrange補間器
 ///
 /// `sample_m1`、`sample0`、`sample1`、`sample2`の4点を3次Horner形式で評価する。係数はQ2.16へ量子化し、組み合わせlatencyは0です
 module CubicLagrangeInterpolatorCore #(
-    param SAMPLE_WIDTH : u32          = 24                                         , /// サンプルの符号付きビット幅
-    param PHASE_WIDTH  : u32          = 32                                         , /// 位相の小数部ビット幅
-    param ROUNDING_MODE: RoundingMode = RoundingMode::NEAREST_TIES_TO_EVEN         , /// 右シフト時の丸め方式
-    param OVERFLOW_MODE: OverflowMode = OverflowMode::SATURATE                     , /// 出力幅超過時の処理方式
-    const NUM_WIDTH    : u32          = SAMPLE_WIDTH + 2 + 18 + PHASE_WIDTH * 3 + 3,
-    const OUTPUT_SHIFT : u32          = 16 + PHASE_WIDTH * 3                       ,
+    param SAMPLE_WIDTH : u32                 = 24                                         , /// サンプルの符号付きビット幅
+    param PHASE_WIDTH  : u32                 = 32                                         , /// 位相の小数部ビット幅
+    param ROUNDING_MODE: Types::RoundingMode = Types::RoundingMode::NEAREST_TIES_TO_EVEN  , /// 右シフト時の丸め方式
+    param OVERFLOW_MODE: Types::OverflowMode = Types::OverflowMode::SATURATE              , /// 出力幅超過時の処理方式
+    const NUM_WIDTH    : u32                 = SAMPLE_WIDTH + 2 + 18 + PHASE_WIDTH * 3 + 3,
+    const OUTPUT_SHIFT : u32                 = 16 + PHASE_WIDTH * 3                       ,
 ) (
     sample_m1: input  signed logic<SAMPLE_WIDTH>, /// 補間窓の1つ前のサンプル
     sample0  : input  signed logic<SAMPLE_WIDTH>, /// 補間窓の第1サンプル
@@ -65,19 +67,17 @@ module CubicLagrangeInterpolatorCore #(
 /// formatを保持したsample interfaceを使う4点3次Lagrange補間器
 ///
 /// 既定のQ2.23はASRC処理中のheadroomを確保する。Horner段の乗算は27x36 DSP幅を超えるため、resource重視のASRC経路にはhalfbandとlinearの組合せを推奨する
-pub module CubicLagrangeInterpolator::<
-    FORMAT: gndless_fixedpoint::SignedFixedPointFormat = gndless_fixedpoint::Q2_23,
-> #(
-    param PHASE_WIDTH  : u32          = 32                                , /// 位相の小数部ビット幅
-    param ROUNDING_MODE: RoundingMode = RoundingMode::NEAREST_TIES_TO_EVEN, /// 右シフト時の丸め方式
-    param OVERFLOW_MODE: OverflowMode = OverflowMode::SATURATE            , /// 出力範囲超過時の処理方式
+pub module CubicLagrangeInterpolator::<FORMAT: gndless_fixedpoint::SignedFixedPointFormat = Q2_23> #(
+    param PHASE_WIDTH  : u32                 = 32                                       , /// 位相の小数部ビット幅
+    param ROUNDING_MODE: Types::RoundingMode = Types::RoundingMode::NEAREST_TIES_TO_EVEN, /// 右シフト時の丸め方式
+    param OVERFLOW_MODE: Types::OverflowMode = Types::OverflowMode::SATURATE            , /// 出力範囲超過時の処理方式
 ) (
-    sample_m1: modport gndless_fixedpoint::FixedPointValue::<FORMAT>::input_port              , /// 補間窓の1つ前のsample
-    sample0  : modport gndless_fixedpoint::FixedPointValue::<FORMAT>::input_port              , /// 補間窓の第1sample
-    sample1  : modport gndless_fixedpoint::FixedPointValue::<FORMAT>::input_port              , /// 補間窓の第2sample
-    sample2  : modport gndless_fixedpoint::FixedPointValue::<FORMAT>::input_port              , /// 補間窓の第3sample
-    phase    : input   logic                                                     <PHASE_WIDTH>, /// sample0からsample1へ進む位相
-    sample   : modport gndless_fixedpoint::FixedPointValue::<FORMAT>::output_port             , /// 補間結果
+    sample_m1: modport FixedPointValue::<FORMAT>::input_port              , /// 補間窓の1つ前のsample
+    sample0  : modport FixedPointValue::<FORMAT>::input_port              , /// 補間窓の第1sample
+    sample1  : modport FixedPointValue::<FORMAT>::input_port              , /// 補間窓の第2sample
+    sample2  : modport FixedPointValue::<FORMAT>::input_port              , /// 補間窓の第3sample
+    phase    : input   logic                                 <PHASE_WIDTH>, /// sample0からsample1へ進む位相
+    sample   : modport FixedPointValue::<FORMAT>::output_port             , /// 補間結果
 ) {
     inst core: CubicLagrangeInterpolatorCore #(
         SAMPLE_WIDTH : FORMAT::WIDTH,
@@ -149,9 +149,9 @@ module test_cubic_lagrange_interpolator_overflow {
     var wrapped  : signed logic<4>;
 
     inst dut_saturated: CubicLagrangeInterpolatorCore #(
-        SAMPLE_WIDTH : 4                     ,
-        PHASE_WIDTH  : 3                     ,
-        OVERFLOW_MODE: OverflowMode::SATURATE,
+        SAMPLE_WIDTH : 4                            ,
+        PHASE_WIDTH  : 3                            ,
+        OVERFLOW_MODE: Types::OverflowMode::SATURATE,
     ) (
         sample_m1           ,
         sample0             ,
@@ -161,9 +161,9 @@ module test_cubic_lagrange_interpolator_overflow {
         sample   : saturated,
     );
     inst dut_wrapped: CubicLagrangeInterpolatorCore #(
-        SAMPLE_WIDTH : 4                 ,
-        PHASE_WIDTH  : 3                 ,
-        OVERFLOW_MODE: OverflowMode::WRAP,
+        SAMPLE_WIDTH : 4                        ,
+        PHASE_WIDTH  : 3                        ,
+        OVERFLOW_MODE: Types::OverflowMode::WRAP,
     ) (
         sample_m1         ,
         sample0           ,
