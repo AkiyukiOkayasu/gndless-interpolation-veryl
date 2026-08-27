@@ -1,5 +1,6 @@
 import gndless_fixedpoint::Types;
 import gndless_fixedpoint::FixedPointValue;
+import gndless_fixedpoint::SignedFixedPointFormat;
 import gndless_fixedpoint::Q2_23;
 
 /// 4点3次Lagrange補間器
@@ -67,7 +68,7 @@ module CubicLagrangeInterpolatorCore #(
 /// formatを保持したsample interfaceを使う4点3次Lagrange補間器
 ///
 /// 既定のQ2.23はASRC処理中のheadroomを確保する。Horner段の乗算は27x36 DSP幅を超えるため、resource重視のASRC経路にはhalfbandとlinearの組合せを推奨する
-pub module CubicLagrangeInterpolator::<FORMAT: gndless_fixedpoint::SignedFixedPointFormat = Q2_23> #(
+pub module CubicLagrangeInterpolator::<FORMAT: SignedFixedPointFormat = Q2_23> #(
     param PHASE_WIDTH  : u32                 = 32                                       , /// 位相の小数部ビット幅
     param ROUNDING_MODE: Types::RoundingMode = Types::RoundingMode::NEAREST_TIES_TO_EVEN, /// 右シフト時の丸め方式
     param OVERFLOW_MODE: Types::OverflowMode = Types::OverflowMode::SATURATE            , /// 出力範囲超過時の処理方式

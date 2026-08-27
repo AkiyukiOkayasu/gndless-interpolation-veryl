@@ -1,5 +1,6 @@
 import gndless_fixedpoint::Types;
 import gndless_fixedpoint::FixedPointValue;
+import gndless_fixedpoint::SignedFixedPointFormat;
 import gndless_fixedpoint::Q4_23;
 
 /// 2点間の線形補間器
@@ -43,7 +44,7 @@ module LinearInterpolatorCore #(
 /// formatを保持したsample interfaceを使う2点間の線形補間器
 ///
 /// `FORMAT`はsampleの幅とbinary pointを一体で指定する。既定のQ4.23は24bit PCM(Q1.23)と同じ2^-23グリッドを保ち、±8.0の範囲で扱う
-pub module LinearInterpolator::<FORMAT: gndless_fixedpoint::SignedFixedPointFormat = Q4_23> #(
+pub module LinearInterpolator::<FORMAT: SignedFixedPointFormat = Q4_23> #(
     param PHASE_WIDTH  : u32                 = 32                                       , /// 位相の小数部ビット幅
     param ROUNDING_MODE: Types::RoundingMode = Types::RoundingMode::NEAREST_TIES_TO_EVEN, /// 右シフト時の丸め方式
     param OVERFLOW_MODE: Types::OverflowMode = Types::OverflowMode::SATURATE            , /// 出力範囲超過時の処理方式
