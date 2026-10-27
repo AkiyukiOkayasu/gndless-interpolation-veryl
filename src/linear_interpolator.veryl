@@ -8,7 +8,8 @@ import gndless_fixedpoint::resize;
 ///
 /// `phase`は0以上1未満のunsigned Q0.`PHASE_WIDTH`値で、sample0からsample1へ移動する割合を表す。入力窓からの組み合わせlatencyは0です
 /// `delta = sample1 - sample0`はSAMPLE_WIDTH幅でwrapするため、|sample1 - sample0| < 2^(SAMPLE_WIDTH - 1)を要求する。
-/// ±1.0信号では常に成立し、範囲外の入力では出力はwrapにより定義されない。
+/// Q4.23のようなheadroomを持つformatでは±1.0信号で成立する。
+/// Q1.23のフルスケール遷移のように差が2^(SAMPLE_WIDTH - 1)以上になる場合は契約外である。
 /// 乗算は`delta`×`phase_ext`の1個で、既定のQ4.23(27bit)では27x36乗算器1スライスに収まる。
 module LinearInterpolatorCore #(
     param SAMPLE_WIDTH   : u32                 = 24                                       , /// サンプルの符号付きビット幅

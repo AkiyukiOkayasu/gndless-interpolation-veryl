@@ -4,6 +4,8 @@
 
 ### Changed
 
+- `LinearInterpolatorCore`のdelta契約を修正し、Q1.23のフルスケール遷移は契約外であることを明記した
+- READMEの既定formatを`LinearInterpolator`=Q4.23、`CubicLagrangeInterpolator`=Q2.23へ修正した
 - `gndless_fixedpoint`の package をトップレベル import し、`FixedPointValue` / `Q4_23` / `Q2_23` の完全修飾パスを短縮（Veryl 0.20.3 の namespace import 機能を使用）
 - `SignedFixedPointFormat` を import し、generic constraint の完全修飾パスを短縮（Veryl 0.20.3-nightly の proto package import 機能を使用）
 - `gndless_fixedpoint`の project-scope function (`resize`) を import し、linear／cubic の完全修飾呼び出しを短縮（Veryl 0.21 の project-scope function import 機能を使用）
@@ -24,5 +26,5 @@
 
 ## BREAKING CHANGE
 
-- `LinearInterpolator`と`CubicLagrangeInterpolator`を`FORMAT` genericと`FixedPointValue::<FORMAT>` portへ移行し、既定formatをQ4.23へ変更
+- `LinearInterpolator`と`CubicLagrangeInterpolator`を`FORMAT` genericと`FixedPointValue::<FORMAT>` portへ移行し、既定formatを`LinearInterpolator`はQ4.23、`CubicLagrangeInterpolator`はQ2.23へ変更
 - `LinearInterpolatorCore`の`delta`をSAMPLE_WIDTH幅のwrap減算へ変更し、|sample1 - sample0| < 2^(SAMPLE_WIDTH - 1)の入力契約をdoc commentへ明記した。既定のQ4.23(27bit)ではdelta×phase_extが27x36乗算器1スライスへ収まる
